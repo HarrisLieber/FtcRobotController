@@ -63,8 +63,10 @@ public class HexbotHardware {
     private AnalogInput endeffectorangle = null;
     // Declare constants for motion limitation
     private final double MAX_DRIVE_POWER = 0.5d;
-    private static final double ARM_MAX_UP_POWER    =  1.0 ;
-    private static final double ARM_MAX_DOWN_POWER  = 0.1 ;
+    // Doubled up springs on the 4-bar linkage, so hopefully mechanism is more balanced up/down.
+    // Note, with one spring per side, constants were 1.0 up and 0.1 down.
+    private static final double ARM_MAX_UP_POWER    =  0.5 ;
+    private static final double ARM_MAX_DOWN_POWER  = 0.4 ;
 
 
     // Define Drive constants.  Make them public so they CAN be used by the calling OpMode
