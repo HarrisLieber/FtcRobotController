@@ -30,12 +30,22 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
+import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
 // Use IntoTheDeep class for functions specific to IntoTheDeep 2024-2025 season mechanisms
 public class IntoTheDeep extends HexbotHardware {
+    /* Declare OpMode members. */
+    private LinearOpMode myOpMode = null;   // gain access to methods in the calling OpMode.
+
+    // Define Motor and Servo objects  (Make them private so they can't be accessed externally)
+    private NormalizedColorSensor color_A = null;
+    private NormalizedColorSensor color_B = null;
+
     // Constants for each preset arm position so we can use them as indices for arrays of setpoints
     private static final int FLOOR = 0;
     private static final int WALL = 1;
@@ -47,28 +57,31 @@ public class IntoTheDeep extends HexbotHardware {
     // Setpoint tables for arm height and end effector angle
     private static int[] arm_pos = {0,0,0,0,0,0,0}; // todo: measure encoder ticks for each position
     private static double[] ee_angle = {0,75,90,90,45,45,150}; // just guesses todo: measure ee positions
-    private static double VOLTS_PER_DEGREE = 0.025; // just a guess todo: measure volts per degree for ee
-    private LookupTable v_level;
-
+    private static ColorMatch colorMatcher = new ColorMatch();
+    private static final NormalizedRGBA TARGET_YELLOW = ColorMatch.makeColor(0.5f,0.5f,0f,1f);
+    private static final NormalizedRGBA TARGET_BLUE = ColorMatch.makeColor(0f,0f,0.5f,1f);
+    private static final NormalizedRGBA TARGET_RED = ColorMatch.makeColor(0.5f,0f,0f,1f);
+    private static final NormalizedRGBA TARGET_FIELD = ColorMatch.makeColor(.1f,.1f,0.1f,.5f); // todo: measure target colors
 
     public IntoTheDeep(LinearOpMode opmode) {
         // run the super class constructor first
         super(opmode);
-        // then initialize season-specific needs
-        // Create a lookup table with:
-        //      Key = Integer (encoder counts for arm motor)
-        //      Value = Double (voltage on the potentiometer for the "level" zero position of end effector)
-        v_level = new LookupTable();
-        v_level.addRow(0,0.0d); // build lookuptable here todo: measure voltage at various arm positions
     }
-    /**
-     * Gets target voltage on the end effector potentiometer based on arm height and desired angle
-     * @param arm_height    encoder count for current or desired arm height
-     * @param angle         desired angle relative to level (0 degrees)
-     * @return              target voltage taking into account arm angle and ee angle relative to arm
-     */
-    public double get_eeTargetVoltage(int arm_height,double angle) {
-        return v_level.getValue(arm_height) + (angle * VOLTS_PER_DEGREE);
+    public void init() {
+        super.init(); // run the normal hardware class init method
+        // then initialize season-specific items
+
+        // Define and Initialize Motors, Servos, Sensors
+        // Initialize the hardware variables. Note that the strings used here must correspond
+        // to the names assigned during the robot configuration step on the DS or RC devices.
+        color_A  = myOpMode.hardwareMap.get(NormalizedColorSensor.class, "color_0");
+        color_B  = myOpMode.hardwareMap.get(NormalizedColorSensor.class, "color_1");
+
+        colorMatcher.addColorMatch(TARGET_YELLOW);
+        colorMatcher.addColorMatch(TARGET_BLUE);
+        colorMatcher.addColorMatch(TARGET_RED);
+        colorMatcher.addColorMatch(TARGET_FIELD);
+        colorMatcher.setConfidenceThreshold(0.9); // todo: test out confidence levels for color matching
     }
 
 

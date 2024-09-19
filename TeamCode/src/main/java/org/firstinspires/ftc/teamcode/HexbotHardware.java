@@ -85,18 +85,30 @@ public class HexbotHardware {
     private double[] speed = {0,0};         // x and y positions in inches/second
     private int[] wheel_travel = {0,0,0};   // alpha, beta, and gamma encoder counts
     private double linear_distance = 0;     // estimated total linear distance in inches
-
+    private static double VOLTS_PER_DEGREE = 0.025; // just a guess todo: measure volts per degree for ee
+    private LookupTable v_level;
     // Create PID controllers for robot turning and robot distance
     private Control turn_control = new Control(1,0,0); // todo: tune PID for turn control
     private Control dist_control = new Control(1,0,0); // todo: tune PID for distance control
+    private double target_heading = 0;
+    private double max_speed = 10.0;
 
 
     // Define a constructor that allows the OpMode to pass a reference to itself.
-    public HexbotHardware(LinearOpMode opmode) {myOpMode = opmode;}
+    public HexbotHardware(LinearOpMode opmode) {
+        this(opmode,0d,0d);
+    }
     // Overload constructor to allow opmode to pass in a starting position
-    public HexbotHardware(LinearOpMode opmode, double[] starting_position) {
+    public HexbotHardware(LinearOpMode opmode, double start_x,double start_y) {
         myOpMode = opmode;
-        setPosition(starting_position);
+        position[0] = start_x;
+        position[1] = start_y;
+
+        // Create a lookup table with:
+        //      Key = Integer (encoder counts for arm motor)
+        //      Value = Double (voltage on the potentiometer for the "level" zero position of end effector)
+        v_level = new LookupTable();
+        v_level.addRow(0,0.0d); // build lookuptable here todo: measure voltage at various arm positions
     }
 
     /**
@@ -153,6 +165,13 @@ public class HexbotHardware {
         myOpMode.telemetry.addData(">", "Hardware Initialized");
         myOpMode.telemetry.update();
     }
+
+    /*
+        *****
+        * DRIVEBASE METHODS
+        *****
+     */
+
     /**
      * Gets current heading of the robot
      * No need to do this if already using xydrive method which returns heading
@@ -233,12 +252,34 @@ public class HexbotHardware {
     }
 
     /**
-     * Pass the requested wheel motor powers to the appropriate hardware drive motors.
+     * Calculates the motor powers required to achieve the requested
+     * robot motions: Drive (Axial motion) and Turn (Yaw motion).
+     * This version uses PID control to create a turn command to control heading to target_heading
+     * Then sends these power levels to the motors.
      *
-     * @param alpha     Fwd/Rev driving power (-1.0 to 1.0) +ve is forward
-     * @param beta      Fwd/Rev driving power (-1.0 to 1.0) +ve is forward
-     * @param gamma     Fwd/Rev driving power (-1.0 to 1.0) +ve is forward
+     * @param drive_x   X direction driving power (-1.0 to 1.0) +ve is forward
+     * @param drive_y   Y direction driving power
+     * @return          Current heading in degrees
      */
+    public double xydrive(double drive_x, double drive_y) {
+        // use turn PID controller to calculate turn input
+        return xydrive(drive_x,drive_y,turn_to_target()); //
+    }
+
+    private double turn_to_target(double target_heading) {
+        return 0d; // todo: write turn controller
+    }
+    private double turn_to_target() {
+        return turn_to_target(target_heading);
+    }
+
+        /**
+         * Pass the requested wheel motor powers to the appropriate hardware drive motors.
+         *
+         * @param alpha     Fwd/Rev driving power (-1.0 to 1.0) +ve is forward
+         * @param beta      Fwd/Rev driving power (-1.0 to 1.0) +ve is forward
+         * @param gamma     Fwd/Rev driving power (-1.0 to 1.0) +ve is forward
+         */
     public void setDrivePower(double alpha, double beta, double gamma) {
         // Output the values to the motor drives.
         alphaDrive.setPower(alpha);
@@ -250,66 +291,70 @@ public class HexbotHardware {
      * Calculates the motor powers required to achieve the requested
      * robot motions: Drive (Axial motion) and Turn (Yaw motion).
      * Then sends these power levels to the motors.
-     * This function takes a single speed and direction rather than x and y
+     * This function takes a single power and bearing rather than x and y
      *
      * @param power     driving power in selected direction (-1.0 to 1.0)
-     * @param direction direction of movement in degrees
+     * @param bearing   direction of movement in degrees
      * @param turn      Right/Left turning power (-1.0 to 1.0) +ve is CW
      * @return          Current heading in degrees
      */
-    public double tridrive(double power, double direction, double turn) {
-        return xydrive(Math.sin(Math.toRadians(direction)),Math.cos(Math.toRadians(direction)),turn);
+    public double bearingdrive(double power, double bearing, double turn) {
+        return xydrive(power * Math.sin(Math.toRadians(bearing)),power * Math.cos(Math.toRadians(bearing)),turn);
     }
 
-    // todo: add a public method for XY driving with turn control to a heading
-    // todo: add a public method for straightline driving with turn control to a heading
-    // todo: add a public method for straightline driving with turn control and distance control
+    /**
+     * Calculates the motor powers required to achieve the requested
+     * robot motions: Drive (Axial motion) and Turn (Yaw motion).
+     * This version uses PID control to create a turn command to control heading to target_heading
+     * Then sends these power levels to the motors.
+     * This function takes a single power and bearing rather than x and y
+     *
+     * @param power     driving power in selected direction (-1.0 to 1.0)
+     * @param bearing   direction of movement in degrees
+     * @return          Current heading in degrees
+     */
+    public double bearingdrive(double power, double bearing) {
+        return bearingdrive(power,bearing,turn_to_target());
+    }
+
+    /**
+     * Calculates the motor powers required to achieve the requested
+     * robot motions: Drive (Axial motion) and Turn (Yaw motion).
+     * This version uses PID control to travel in a straight line for a given distance
+     * Then sends these power levels to the motors.
+     * This function takes a distance and bearing rather than x and y, with power limited by max_speed
+     *
+     * @param distance  distance to travel, in inches
+     * @param bearing   direction of movement in degrees
+     * @param turn      Right/Left turning power (-1.0 to 1.0) +ve is CW
+     * @return          Current heading in degrees
+     */
+    public double straightdrive(double distance, double bearing,double turn) {
+        return bearingdrive(drive_target_distance(distance),bearing,turn);
+    }
+
+    /**
+     * Calculates the motor powers required to achieve the requested
+     * robot motions: Drive (Axial motion) and Turn (Yaw motion).
+     * This version uses PID control to travel in a straight line for a given distance
+     * This version also uses PID control to turn to a specified heading
+     * Then sends these power levels to the motors.
+     * This function takes a distance and bearing rather than x and y, with power limited by max_speed
+     *
+     * @param distance  distance to travel, in inches
+     * @param bearing   direction of movement in degrees
+     * @return          Current heading in degrees
+     */
+    public double straightdrive(double distance, double bearing) {
+        return straightdrive(distance,bearing,turn_to_target());
+    }
+    private double drive_target_distance(double distance) {
+        return 0.5d; // todo: write distance controller to drive linear_distance to target distance
+    }
 
     public void stop() {
         xydrive(0,0,0);
     }
-
-
-
-        /**
-         * Pass the requested arm power to the appropriate hardware drive motor
-         *
-         * @param power driving power (-1.0 to 1.0)
-         * @return      current encorder reading for this motor
-         */
-    public int setArmPower(double power) {
-        // Scale the values so arm does not exceed maximum power
-        if (power > 0) {
-            arm.setPower(power*ARM_MAX_UP_POWER);
-        } else {
-            arm.setPower(power*ARM_MAX_DOWN_POWER);
-        }
-        int pos = arm.getCurrentPosition();
-        return pos;
-    }
-
-    /**
-     * Set turntable position.
-     *
-     * @param offset
-     */
-    public void setTTPosition(double offset) {
-        offset = Range.clip(offset, -0.5, 0.5);
-        turntable.setPosition(MID_SERVO + offset);
-    }
-
-
-    /**
-     * Pass the requested end effector power to the end effector servo
-     *
-     * @param power driving power (-1.0 to 1.0)
-     * @return      voltage of angle feedback potentiometer on this end effector
-     */
-    public double setEEPower(double power) {
-        endeffector.setPower(power);
-        return endeffectorangle.getVoltage();
-    }
-
     /**
      * Reset yaw on IMU
      *
@@ -320,10 +365,6 @@ public class HexbotHardware {
 
     public double[] getPosition() {
         return position;
-    }
-
-    public void setPosition(double[] position) {
-        this.position = position;
     }
 
     public double[] getSpeed() {
@@ -389,5 +430,83 @@ public class HexbotHardware {
         // lastly we can save the current motor encoder counts for next time through the loop
         wheel_travel = newtravel;
     }
+
+    public double getTarget_heading() {
+        return target_heading;
+    }
+
+    public void setTarget_heading(double target_heading) {
+        this.target_heading = target_heading; // todo: error checking on commanded target heading
+    }
+
+    public double getMax_speed() {
+        return max_speed;
+    }
+
+    public void setMax_speed(double max_speed) {
+        this.max_speed = max_speed; // todo: error checking on commanded max speed
+    }
+
+
+    /*
+     *****
+     * ARM RAISE/LOWER METHODS
+     *****
+     */
+
+    /**
+         * Pass the requested arm power to the appropriate hardware drive motor
+         *
+         * @param power driving power (-1.0 to 1.0)
+         * @return      current encorder reading for this motor
+         */
+    public int setArmPower(double power) {
+        // Scale the values so arm does not exceed maximum power
+        if (power > 0) {
+            arm.setPower(power*ARM_MAX_UP_POWER);
+        } else {
+            arm.setPower(power*ARM_MAX_DOWN_POWER);
+        }
+        int pos = arm.getCurrentPosition();
+        return pos;
+    }
+
+    /*
+     *****
+     * END EFFECTOR METHODS
+     *****
+     */
+
+    /**
+     * Set turntable position.
+     *
+     * @param offset
+     */
+    public void setTTPosition(double offset) {
+        offset = Range.clip(offset, -0.5, 0.5);
+        turntable.setPosition(MID_SERVO + offset);
+    }
+
+    /**
+     * Pass the requested end effector power to the end effector servo
+     *
+     * @param power driving power (-1.0 to 1.0)
+     * @return      voltage of angle feedback potentiometer on this end effector
+     */
+    public double setEEPower(double power) {
+        endeffector.setPower(power);
+        return endeffectorangle.getVoltage();
+    }
+
+    /**
+     * Calculate target voltage on the end effector potentiometer based on arm height and desired angle
+     * @param arm_height    encoder count for current or desired arm height
+     * @param angle         desired angle relative to level (0 degrees)
+     * @return              target voltage taking into account arm angle and ee angle relative to arm
+     */
+    public double get_eeTargetVoltage(int arm_height,double angle) {
+        return v_level.getValue(arm_height) + (angle * VOLTS_PER_DEGREE);
+    }
+
 
 }
