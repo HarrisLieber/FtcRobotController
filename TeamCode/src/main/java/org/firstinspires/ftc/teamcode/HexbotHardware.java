@@ -44,6 +44,7 @@ import com.qualcomm.robotcore.util.Range;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
+// Use HexbotHardware class for hardware functions that are not game/season specific
 public class HexbotHardware {
 
     /* Declare OpMode members. */
@@ -57,7 +58,7 @@ public class HexbotHardware {
     // Declare OpMode members for servos.
     private CRServo endeffector = null;
     private ServoImplEx turntable = null;
-    private Servo grabber = null;
+    private Servo grabber = null; // todo: decide if the grabber activation is generic or season-specific
     // Declare Sensor objects
     private IMU imu = null;
     private AnalogInput endeffectorangle = null;
@@ -73,9 +74,29 @@ public class HexbotHardware {
     public static final double MID_SERVO       =  0.5 ;
     public static final double TT_SPEED      =  0.02 ;  // sets rate to move turntable servo
 
+    // Using classic AndyMark NeverRest 4o meters for drive wheels
+    // 28 ticks per rotation for motor only, times GR 40 = 1120 ticks/rotation
+    private static final int DRIVE_TICKS_PER_ROT = 1120;
+    // Using Tetrix Max 4 in Omni Wheels
+    private static final double WHEEL_DIAM = 4.0d;
+
+    // Define fields for saving information about position and speed between iterations of main loop
+    private double[] position = {0,0};      // x and y positions in inches
+    private double[] speed = {0,0};         // x and y positions in inches/second
+    private int[] wheel_travel = {0,0,0};   // alpha, beta, and gamma encoder counts
+    private double linear_distance = 0;     // estimated total linear distance in inches
+
+    // Create PID controllers for robot turning and robot distance
+    private Control turn_control = new Control(1,0,0); // todo: tune PID for turn control
+    private Control dist_control = new Control(1,0,0); // todo: tune PID for distance control
+
+
     // Define a constructor that allows the OpMode to pass a reference to itself.
-    public HexbotHardware(LinearOpMode opmode) {
+    public HexbotHardware(LinearOpMode opmode) {myOpMode = opmode;}
+    // Overload constructor to allow opmode to pass in a starting position
+    public HexbotHardware(LinearOpMode opmode, double[] starting_position) {
         myOpMode = opmode;
+        setPosition(starting_position);
     }
 
     /**
@@ -114,6 +135,12 @@ public class HexbotHardware {
         gammaDrive.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
         betaDrive.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
         arm.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+
+        // initialize wheel_travel to initial encoder values from motors
+        wheel_travel[0] = alphaDrive.getCurrentPosition();
+        wheel_travel[1] = betaDrive.getCurrentPosition();
+        wheel_travel[2] = gammaDrive.getCurrentPosition();
+
         // Define Hub orientation
         RevHubOrientationOnRobot.LogoFacingDirection logoDirection = RevHubOrientationOnRobot.LogoFacingDirection.UP;
         RevHubOrientationOnRobot.UsbFacingDirection  usbDirection  = RevHubOrientationOnRobot.UsbFacingDirection.BACKWARD;
@@ -145,12 +172,12 @@ public class HexbotHardware {
      * robot motions: Drive (Axial motion) and Turn (Yaw motion).
      * Then sends these power levels to the motors.
      *
-     * @param Drive_x   X direction driving power (-1.0 to 1.0) +ve is forward
-     * @param Drive_y   Y direction driving power
-     * @param Turn      Right/Left turning power (-1.0 to 1.0) +ve is CW
+     * @param drive_x   X direction driving power (-1.0 to 1.0) +ve is forward
+     * @param drive_y   Y direction driving power
+     * @param turn      Right/Left turning power (-1.0 to 1.0) +ve is CW
      * @return          Current heading in degrees
      */
-    public double xydrive(double Drive_x, double Drive_y, double Turn) {
+    public double xydrive(double drive_x, double drive_y, double turn) {
         /*
          We assume a three omniwheel holonomic robot with wheels 120 degrees offset, named
          alpha, beta, and gamma, such that "front" of robot is at point between alpha and beta like so:
@@ -184,9 +211,9 @@ public class HexbotHardware {
         // Calculate the determinant of our X matrix, [X]^-1 in description above:
         double determinant = sin[0]*(cos[1]-cos[2])+sin[1]*(cos[2]-cos[0])+sin[2]*(cos[0]-cos[1]);
         // Lastly we can determine the desired drive power for each wheel:
-        double F_alpha = (Drive_x*(cos[1]-cos[2])+Drive_y*(sin[2]-sin[1])+Turn*(sin[1]*cos[2]-sin[2]*cos[1]))/determinant;
-        double F_beta = (Drive_x*(cos[2]-cos[0])+Drive_y*(sin[0]-sin[2])+Turn*(sin[2]*cos[0]-sin[0]*cos[2]))/determinant;
-        double F_gamma = (Drive_x*(cos[0]-cos[1])+Drive_y*(sin[1]-sin[0])+Turn*(sin[0]*cos[1]-sin[1]*cos[0]))/determinant;
+        double F_alpha = (drive_x*(cos[1]-cos[2])+drive_y*(sin[2]-sin[1])+turn*(sin[1]*cos[2]-sin[2]*cos[1]))/determinant;
+        double F_beta = (drive_x*(cos[2]-cos[0])+drive_y*(sin[0]-sin[2])+turn*(sin[2]*cos[0]-sin[0]*cos[2]))/determinant;
+        double F_gamma = (drive_x*(cos[0]-cos[1])+drive_y*(sin[1]-sin[0])+turn*(sin[0]*cos[1]-sin[1]*cos[0]))/determinant;
 
         // Scale the values so none exceed maximum drive power
         double max = Math.max(Math.max(Math.abs(F_alpha), Math.abs(F_beta)), Math.abs(F_gamma));
@@ -198,6 +225,9 @@ public class HexbotHardware {
 
         // Use existing function to drive three wheels.
         setDrivePower(F_alpha,F_beta,F_gamma);
+        // Update position parameters based on the heading pulled from the IMU above
+        // We pass the sin and cos arrays to avoid pulling heading again or repeating the math
+        updatePosition(sin,cos);
         // return current heading
         return orientation.getYaw(AngleUnit.DEGREES);
     }
@@ -217,11 +247,36 @@ public class HexbotHardware {
     }
 
     /**
-     * Pass the requested arm power to the appropriate hardware drive motor
+     * Calculates the motor powers required to achieve the requested
+     * robot motions: Drive (Axial motion) and Turn (Yaw motion).
+     * Then sends these power levels to the motors.
+     * This function takes a single speed and direction rather than x and y
      *
-     * @param power driving power (-1.0 to 1.0)
-     * @return      current encorder reading for this motor
+     * @param power     driving power in selected direction (-1.0 to 1.0)
+     * @param direction direction of movement in degrees
+     * @param turn      Right/Left turning power (-1.0 to 1.0) +ve is CW
+     * @return          Current heading in degrees
      */
+    public double tridrive(double power, double direction, double turn) {
+        return xydrive(Math.sin(Math.toRadians(direction)),Math.cos(Math.toRadians(direction)),turn);
+    }
+
+    // todo: add a public method for XY driving with turn control to a heading
+    // todo: add a public method for straightline driving with turn control to a heading
+    // todo: add a public method for straightline driving with turn control and distance control
+
+    public void stop() {
+        xydrive(0,0,0);
+    }
+
+
+
+        /**
+         * Pass the requested arm power to the appropriate hardware drive motor
+         *
+         * @param power driving power (-1.0 to 1.0)
+         * @return      current encorder reading for this motor
+         */
     public int setArmPower(double power) {
         // Scale the values so arm does not exceed maximum power
         if (power > 0) {
@@ -261,6 +316,78 @@ public class HexbotHardware {
      */
     public void resetGyro() {
         imu.resetYaw();
+    }
+
+    public double[] getPosition() {
+        return position;
+    }
+
+    public void setPosition(double[] position) {
+        this.position = position;
+    }
+
+    public double[] getSpeed() {
+        return speed;
+    }
+
+    public double getDistance() {
+        return linear_distance;
+    }
+
+    /**
+     * For convenience, resetDistance returns distance so you don't have to getDistance AND reset it
+     * @return value of linear distance traveled prior to reset
+     */
+    public double resetDistance() {
+        double tempdistance = linear_distance;
+        linear_distance = 0;
+        return tempdistance;
+    }
+
+    /**
+     * Update position variables based on heading and travel of the drive wheels
+     * @param sin Array of sin of angles of each wheel (alpha, beta, gamma) relative to heading 0
+     * @param cos Array of sin of angles of each wheel (alpha, beta, gamma) relative to heading 0
+     */
+    private void updatePosition(double[] sin, double[] cos) {
+        // temporarily grab the encoder count for each motor
+        int[] newtravel = {alphaDrive.getCurrentPosition(), betaDrive.getCurrentPosition(), gammaDrive.getCurrentPosition()};
+        double[] velocities = {alphaDrive.getVelocity(),betaDrive.getVelocity(),gammaDrive.getVelocity()};
+        double distance_x = 0, distance_y = 0,speed_x = 0, speed_y = 0;
+        /*
+        A note about the math when calculating distance traveled:
+            Each omni-wheel wheel spins freely in the direction perpendicular to its driven direction
+            so we can't measure the distance traveled in the spinning-freely direction
+            but we can figure it out by measuring the distance traveled by the other wheels
+            In fact, if we add the distances traveled in a particular direction of all three wheels
+            we will always get 1.5 times the robot's distance in that direction due to the fact
+            that the wheels are 120 degrees separated from one another.
+
+        We start with x and y distance of zero, as initialized above.
+        Then, for i = 0, 1, and 2, add in the x and y components of distance traveled and multiply by 2/3
+        Distance each wheel traveled is:
+            Change in encoder count * pi * wheel diameter / ticks per rotation for drive gearmotor
+            Then we multiply by 2/3 as described above
+         We can do the same for speed in x and y directions by getting motor speed in ticks/second
+         */
+        for (int i = 0; i < 3; i++) {
+            distance_x += sin[i] * (newtravel[i] - wheel_travel[i]);
+            distance_y += cos[i] * (newtravel[i] - wheel_travel[i]);
+            speed_x += sin[i] * velocities[i];
+            speed_y += cos[i] * velocities[i];
+        }
+        distance_x *= (Math.PI * WHEEL_DIAM * 2 / 3 / DRIVE_TICKS_PER_ROT);
+        distance_y *= (Math.PI * WHEEL_DIAM * 2 / 3 / DRIVE_TICKS_PER_ROT);
+        speed_x *= (Math.PI * WHEEL_DIAM * 2 / 3 / DRIVE_TICKS_PER_ROT);
+        speed_y *= (Math.PI * WHEEL_DIAM * 2 / 3 / DRIVE_TICKS_PER_ROT);
+        position[0] += distance_x;
+        position[1] += distance_y;
+        speed[0] = speed_x;
+        speed[1] = speed_y;
+        // Estimate linear distance traveled using pythagoream theorum
+        linear_distance += Math.hypot(distance_x,distance_y);
+        // lastly we can save the current motor encoder counts for next time through the loop
+        wheel_travel = newtravel;
     }
 
 }

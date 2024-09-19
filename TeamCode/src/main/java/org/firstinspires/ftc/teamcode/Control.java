@@ -29,6 +29,8 @@
 
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.robotcore.util.ElapsedTime;
+
 public class Control {
 
     private double integral;
@@ -37,6 +39,8 @@ public class Control {
     private double ki;
     private double kd;
     private double int_range;
+    // Create a timer for accurately tracking derivative control
+    private ElapsedTime timer = new ElapsedTime(ElapsedTime.Resolution.MILLISECONDS);
 
     // Allow a new controller to be created with no parameters - default to proportional only, kp=1
     public Control() {
@@ -83,9 +87,11 @@ public class Control {
     /**
      * Set integral range alone
      * @param ir    Integral range, limiting size of error we allow to be added to integral term
+    */
     public void setIntegralRange(double ir) {
         if (ir >= 0) int_range = ir;
     }
+
     /**
      * Retrieve PID control constants
      * @return array of all four PID constants (kp,ki,kd, and integral range)
@@ -99,16 +105,10 @@ public class Control {
         integral = 0.0d;
         lasterror = 0.0d;
     }
-    /**
-     * Use PID control to return a feedback term using PID constants
-     * PID output = kp * error + ki*integral term + kd * derivative term
-     * @param error     error term feeding into the controller
-     * @return          PID control output
-     */
-    public double PID(double error) {
-        /*
-        PID control roughly is simply output = kp * error + ki*integral term + kd * derivative term
 
+    // Broke out the integral term calculation to improve code reuse
+    private double setIntegralTerm(double error) {
+        /*
         We add  countermeasures for integral windup since we may have large error at the start of
         control, for example distance control for moving a robot.
 
@@ -116,7 +116,7 @@ public class Control {
         overshoot (integral control is supposed to get us to the target, not make us go past it
 
         We allow maximum integral range to be set to prevent the integral term from getting
-        huge. OUtside of that range we limit the integral term to no bigger than error.
+        huge. Outside of that range we limit the integral term to no bigger than error.
         If integral_range=0 we ignore it and just do integral control as normal
         */
         if ((error * lasterror) < 0) {
@@ -132,11 +132,54 @@ public class Control {
             // Add error to integral term
             integral += error;
         }
-        double derivative = error - lasterror;  //calculate derivative term (error - last error)
-        lasterror = error;                      //save this iterations error for next iteration
+        return integral;
+    }
+    private double setDerivativeTerm(double error) {
+        // calculate derivative term (error - last error)/duration since last loop
+        // then reset the timer
+        double derivative = (error - lasterror)/timer.milliseconds();
+        timer.reset();
+        return derivative;
+    }
+    /**
+     * Use PID control to return a feedback term using PID constants
+     * PID output = kp * error + ki*integral term + kd * derivative term
+     * @param error     error term feeding into the controller
+     * @return          PID control output
+     */
+    public double PID(double error) {
+        /*
+        PID control roughly is simply output = kp * error + ki*integral term + kd * derivative term
+        */
+        double pid_interim = kp * error;
+        if (ki > 0) pid_interim += setIntegralTerm(error);
+        if (kd > 0) pid_interim += setDerivativeTerm(error);
+        //save this iteration's error for next iteration
+        lasterror = error;
         // return the PID control output
-        return (kp * error) + (ki * integral) + (kd * derivative);
+        return pid_interim;
     }
 
+    /**
+     * Use PID control to return a feedback term using PID constants
+     * PID output = kp * error + ki*integral term + kd * derivative term
+     * Note: overloading PID method to allow passing first derivative into function instead of estimating it
+     * @param error         error term feeding into the controller
+     * @param derivative    derivative term (first derivative i.e. change) feeding into controller
+     * @return          PID control output
+     */
+    public double PID(double error,double derivative) {
+        /*
+        PID control roughly is simply output = kp * error + ki*integral term + kd * derivative term
+        */
+        double pid_interim = kp * error;
+        if (ki > 0) pid_interim += setIntegralTerm(error);
+        if (kd > 0) pid_interim += derivative;
+        //save this iteration's error for next iteration
+        lasterror = error;
+        // return the PID control output
+        return pid_interim;
+
+    }
 
 }

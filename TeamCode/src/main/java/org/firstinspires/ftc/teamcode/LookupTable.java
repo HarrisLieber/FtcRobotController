@@ -38,24 +38,28 @@ import java.util.TreeMap;
 
 
 public class LookupTable {
-    private TreeMap<Double,Double> l_Table;
+    private TreeMap<Integer,Double> l_Table; // todo: is there a way to genericize so lookup key could be other types?
+
 
     public LookupTable() {
-        l_Table = new TreeMap<Double, Double>();
+        l_Table = new TreeMap<Integer,Double>();
     }
-    // Overload constructor to allow alternative method of creating lookup table
-    public LookupTable(TreeMap<Double,Double> newtree) {
-        l_Table = newtree;
-    }
-
 
     /**
      * Add a row to the lookup table in key,value pairs (double, double)
-     * @param key   double representing the lookup key for which to generate a value
-     * @param value double representing the value associated with that key
+     * @param key   number representing the lookup key for which to generate a value
+     * @param value number representing the value associated with that key
      */
-    public void addRow(double key, double value) {
+    public void addRow(int key, double value) {
         l_Table.put(key, value);
+    }
+
+    /**
+     * Retrieve the lookup table for logging etc
+     * @return The whole lookup table
+     */
+    public TreeMap<Integer,Double> getTable() {
+        return l_Table;
     }
 
     /**
@@ -63,9 +67,9 @@ public class LookupTable {
      * @param key   double representing the lookup key for which to generate a value
      * @return      value for that key based on linear interpolation from existing table entries
      */
-    public double getValue(double key) {
-        double key1;
-        double key2;
+    public double getValue(int key) {
+        int key1;
+        int key2;
 
         // first check if the key exists in the lookup table. If so, simply return the value
         if (l_Table.containsKey(key)) {

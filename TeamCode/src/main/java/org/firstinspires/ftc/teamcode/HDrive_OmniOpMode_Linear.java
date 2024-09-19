@@ -28,6 +28,7 @@ package org.firstinspires.ftc.teamcode;/* Copyright (c) 2021 FIRST. All rights r
  */
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.AnalogInput;
@@ -53,7 +54,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
  */
 
 @TeleOp(name="Basic: H Drive Linear OpMode", group="Linear OpMode")
-// @Disabled
+@Disabled
 public class HDrive_OmniOpMode_Linear extends LinearOpMode {
 
     // Declare OpMode members for each of the 4 motors.

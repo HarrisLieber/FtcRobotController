@@ -42,7 +42,7 @@ public class OmniOpMode_hexbot extends LinearOpMode {
 
     // Create a RobotHardware object to be used to access robot hardware.
     // Prefix any hardware functions with "robot." to access this class.
-    HexbotHardware robot       = new HexbotHardware(this);
+    IntoTheDeep robot       = new IntoTheDeep(this);
 
     @Override
     public void runOpMode() {
