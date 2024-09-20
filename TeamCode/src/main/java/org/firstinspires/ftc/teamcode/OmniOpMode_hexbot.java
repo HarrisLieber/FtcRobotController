@@ -72,12 +72,12 @@ public class OmniOpMode_hexbot extends LinearOpMode {
 
             // Run wheels in POV mode (note: The joystick goes negative when pushed forward, so negate it)
             // In this mode the Left stick moves the robot in XY directions, right stick rotates.
-            drive[0] = gamepad1.left_stick_x;
-            drive[1] = gamepad1.left_stick_y;
-            turn  =  gamepad1.right_stick_x;
+            drive[0] = gamepad1.right_stick_x;
+            drive[1] = gamepad1.right_stick_y;
+            turn  =  gamepad1.left_stick_x;
 
             // Use right stick Y axis to control arm
-            arm = gamepad1.right_stick_y;
+            arm = gamepad1.left_stick_y;
             arm_pos = robot.setArmPower(arm);
 
             // Combine drive and turn for blended motion, get current heading
