@@ -79,7 +79,7 @@ public class HexbotHardware {
     // Using classic AndyMark NeverRest 4o meters for drive wheels
     // 28 ticks per rotation for motor only, times GR 40 = 1120 ticks/rotation
     private static final int DRIVE_TICKS_PER_ROT = 1120;
-    // Using Tetrix Max 4 in Omni Wheels
+    // Using Tetrix Max 4 inch Omni Wheels
     private static final double WHEEL_DIAM = 4.0d;
 
     // Define fields for saving information about position and speed between iterations of main loop
@@ -189,7 +189,7 @@ public class HexbotHardware {
         // return current heading
         return orientation.getYaw(AngleUnit.DEGREES);
     }
-
+    
     /**
      * Calculates the motor powers required to achieve the requested
      * robot motions: Drive (Axial motion) and Turn (Yaw motion).
@@ -201,6 +201,23 @@ public class HexbotHardware {
      * @return          Current heading in degrees
      */
     public double xydrive(double drive_x, double drive_y, double turn) {
+        // when core XY drive method is called from exernal, deactivate the turn and distance PID controllers
+        turn_control.deactivate();
+        dist_control.deactivate();
+        return internal_xydrive(drive_x,drive_y,turn);
+    }
+    
+    /**
+     * Calculates the motor powers required to achieve the requested
+     * robot motions: Drive (Axial motion) and Turn (Yaw motion).
+     * Then sends these power levels to the motors.
+     *
+     * @param drive_x   X direction driving power (-1.0 to 1.0) +ve is forward
+     * @param drive_y   Y direction driving power
+     * @param turn      Right/Left turning power (-1.0 to 1.0) +ve is CW
+     * @return          Current heading in degrees
+     */
+    private double internal_xydrive(double drive_x, double drive_y, double turn) {
         /*
          We assume a three omniwheel holonomic robot with wheels 120 degrees offset, named
          alpha, beta, and gamma, such that "front" of robot is at point between alpha and beta like so:
@@ -267,12 +284,25 @@ public class HexbotHardware {
      */
     public double xydrive(double drive_x, double drive_y) {
         // use turn PID controller to calculate turn input
-        return xydrive(drive_x,drive_y,turn_to_target()); //
+        // when core XY drive method is called from exernal, deactivate the distance PID controller
+        dist_control.deactivate();
+        return internal_xydrive(drive_x,drive_y,turn_to_target());
     }
 
     private double turn_to_target(double target_heading) {
-        return 0d; // todo: write turn controller
+        // todo: consider some efficiency changes so we're not reading the IMU multiple times per loop
+        YawPitchRollAngles orientation = imu.getRobotYawPitchRollAngles();
+        AngularVelocity angularVelocity = imu.getRobotAngularVelocity(AngleUnit.DEGREES);
+  
+        // Normalize the heading error to a number between -180deg and +180deg
+        // (add 180 and get remainder of dividing by 360 to get a result from 0-180, then subract 180)
+        double error = ((target_heading - orientation.getYaw(AngleUnit.DEGREES) + 180) % 360) - 180;
+        double yawrate = angularVelocity.zRotationRate; // rotation about the Z-axis (yaw) in degrees/second
+
+        // Use PID control (settings defined in Robot Class definition or settable with turn_control.settings)
+        return turn_control.PID(error,yawrate);
     }
+    
     private double turn_to_target() {
         return turn_to_target(target_heading);
     }
@@ -302,8 +332,26 @@ public class HexbotHardware {
      * @param turn      Right/Left turning power (-1.0 to 1.0) +ve is CW
      * @return          Current heading in degrees
      */
+    private double internal_bearingdrive(double power, double bearing, double turn) {
+        return internal_xydrive(power * Math.sin(Math.toRadians(bearing)),power * Math.cos(Math.toRadians(bearing)),turn);
+    }
+
+        /**
+     * Calculates the motor powers required to achieve the requested
+     * robot motions: Drive (Axial motion) and Turn (Yaw motion).
+     * Then sends these power levels to the motors.
+     * This function takes a single power and bearing rather than x and y
+     *
+     * @param power     driving power in selected direction (-1.0 to 1.0)
+     * @param bearing   direction of movement in degrees
+     * @param turn      Right/Left turning power (-1.0 to 1.0) +ve is CW
+     * @return          Current heading in degrees
+     */
     public double bearingdrive(double power, double bearing, double turn) {
-        return xydrive(power * Math.sin(Math.toRadians(bearing)),power * Math.cos(Math.toRadians(bearing)),turn);
+        // when bearingdrive method is called from exernal, deactivate the turn and distance PID controllers
+        turn_control.deactivate();
+        dist_control.deactivate();
+        return internal_xydrive(power * Math.sin(Math.toRadians(bearing)),power * Math.cos(Math.toRadians(bearing)),turn);
     }
 
     /**
@@ -318,7 +366,25 @@ public class HexbotHardware {
      * @return          Current heading in degrees
      */
     public double bearingdrive(double power, double bearing) {
-        return bearingdrive(power,bearing,turn_to_target());
+        // when bearingdrive method is called from exernal, deactivate the distance PID controller
+        dist_control.deactivate();
+        return internal_bearingdrive(power,bearing,turn_to_target());
+    }
+
+    /**
+     * Calculates the motor powers required to achieve the requested
+     * robot motions: Drive (Axial motion) and Turn (Yaw motion).
+     * This version uses PID control to travel in a straight line for a given distance
+     * Then sends these power levels to the motors.
+     * This function takes a distance and bearing rather than x and y, with power limited by max_speed
+     *
+     * @param distance  distance to travel, in inches
+     * @param bearing   direction of movement in degrees
+     * @param turn      Right/Left turning power (-1.0 to 1.0) +ve is CW
+     * @return          Current heading in degrees
+     */
+    private double internal_straightdrive(double distance, double bearing,double turn) {
+        return internal_bearingdrive(drive_target_distance(distance),bearing,turn);
     }
 
     /**
@@ -334,9 +400,11 @@ public class HexbotHardware {
      * @return          Current heading in degrees
      */
     public double straightdrive(double distance, double bearing,double turn) {
-        return bearingdrive(drive_target_distance(distance),bearing,turn);
+        // when bearingdrive method is called from exernal, deactivate the turn PID controller
+        turn_control.deactivate();
+        return internal_bearingdrive(drive_target_distance(distance),bearing,turn);
     }
-
+    
     /**
      * Calculates the motor powers required to achieve the requested
      * robot motions: Drive (Axial motion) and Turn (Yaw motion).
@@ -350,14 +418,27 @@ public class HexbotHardware {
      * @return          Current heading in degrees
      */
     public double straightdrive(double distance, double bearing) {
-        return straightdrive(distance,bearing,turn_to_target());
+        return internal_straightdrive(distance,bearing,turn_to_target());
     }
+    
     private double drive_target_distance(double distance) {
-        return 0.5d; // todo: write distance controller to drive linear_distance to target distance
+        // First, if we're not already controlling with linear distance, reset to zero for beginning of PID control
+        if (!dist_control.isActive()) linear_distance = 0;
+
+        // Use PID control (settings defined in Robot Class definition or settable with dist_control.settings)
+        error = distance - linear_distance;
+        linear_speed = Math.hypot(speed[0],speed[1]); // todo: consider doing this math in updateposition if we will use it elsewhere
+        double interim_power = dist_control.PID(error,linear_speed);
+        if (Math.abs(interim_power) > max_speed) return Math.copysign(max_speed,interim_power);
+        else return interim_power;
+        // todo: limit power using max_speed - is the commanded power really a speed? Currently limiting power to max_speed
+        // todo: should drive methods return error to calling functions so they know when to stop? Should we reset linear_distance?
     }
 
-    public void stop() {
-        xydrive(0,0,0);
+    public double stop() {
+        turn_control.deactivate();
+        dist_control.deactivate();
+        return internal_xydrive(0,0,0);
     }
     /**
      * Reset yaw on IMU
