@@ -41,21 +41,26 @@ public class Control {
     private double int_range;
     // Create a timer for accurately tracking derivative control
     private ElapsedTime timer = new ElapsedTime(ElapsedTime.Resolution.MILLISECONDS);
+    // Create a flag to know if PID control is active
+    private boolean active;
 
     // Allow a new controller to be created with no parameters - default to proportional only, kp=1
     public Control() {
         reset();
         setPIDConstants(1.0, 0,0,0);
+        active = false;
     }
     // overload the constructor to allow PID constants to be set
     public Control(double kp, double ki, double kd) {
         reset();
         setPIDConstants(kp,ki,kd);
+        active = false;
     }
     // overload constructor again to allow PID constants and integral range to be set together
     public Control(double kp, double ki, double kd,double ir) {
         reset();
         setPIDConstants(kp,ki,kd,ir);
+        active = false;
     }
     /**
      * Set PID constants kp, ki, and kd
@@ -104,6 +109,21 @@ public class Control {
         timer.reset();
     }
 
+    /**
+     * Report if PID control is currently active (timer running, integral term accruing error, etc)
+     * @return state of active flag
+     */
+    public boolean isActive() {
+        return active;
+    }
+
+     /**
+     * Turn off PID control
+     */
+    public void deactivate() {
+        active = false;
+    }
+    
     // Broke out the integral term calculation to improve code reuse
     private double setIntegralTerm(double error) {
         /*
@@ -149,13 +169,7 @@ public class Control {
         /*
         PID control roughly is simply output = kp * error + ki*integral term + kd * derivative term
         */
-        double pid_interim = kp * error;
-        if (ki > 0) pid_interim += setIntegralTerm(error);
-        if (kd > 0) pid_interim += setDerivativeTerm(error);
-        //save this iteration's error for next iteration
-        lasterror = error;
-        // return the PID control output
-        return pid_interim;
+        return PID(error,setDerivativeTerm(error));
     }
 
     /**
@@ -171,8 +185,14 @@ public class Control {
         PID control roughly is simply output = kp * error + ki*integral term + kd * derivative term
         */
         double pid_interim = kp * error;
+        // check if we are reactivating from an inactive state (relying on external code to set flag to inactive)
+        // If we're in the first loop from inactive, skip derivative control, set flag to active, and reset
+        if (!active) {
+            reset();
+            active = true;
+        } else if (kd > 0) pid_interim += derivative;
         if (ki > 0) pid_interim += setIntegralTerm(error);
-        if (kd > 0) pid_interim += derivative;
+
         //save this iteration's error for next iteration
         lasterror = error;
         // return the PID control output
