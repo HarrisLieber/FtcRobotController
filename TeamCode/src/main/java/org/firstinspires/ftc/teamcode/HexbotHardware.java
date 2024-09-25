@@ -58,7 +58,8 @@ public class HexbotHardware {
     // Declare OpMode members for servos.
     private CRServo endeffector = null;
     private ServoImplEx turntable = null;
-    private Servo grabber = null; // todo: decide if the grabber activation is generic or season-specific
+    private Servo grabber_A = null;
+    private Servo grabber_B = null;
     // Declare Sensor objects
     private IMU imu = null;
     private AnalogInput endeffectorangle = null;
@@ -71,8 +72,9 @@ public class HexbotHardware {
 
 
     // Define Drive constants.  Make them public so they CAN be used by the calling OpMode
+    // Assuming for now that we want servo midpoint and move speed to be same for all servos
     public static final double MID_SERVO       =  0.5 ;
-    public static final double TT_SPEED      =  0.02 ;  // sets rate to move turntable servo
+    public static final double SERVO_SPEED      =  0.02 ;  // sets rate to move turntable servo
 
     // Using classic AndyMark NeverRest 4o meters for drive wheels
     // 28 ticks per rotation for motor only, times GR 40 = 1120 ticks/rotation
@@ -129,7 +131,9 @@ public class HexbotHardware {
         endeffector = myOpMode.hardwareMap.get(CRServo.class,"ee_0");
         endeffectorangle = myOpMode.hardwareMap.get(AnalogInput.class,"pot_0");
         turntable = myOpMode.hardwareMap.get(ServoImplEx.class,"tt_1");
-        grabber = myOpMode.hardwareMap.get(Servo.class,"grabber_2");
+        grabber_A = myOpMode.hardwareMap.get(Servo.class,"grabber_2");
+        grabber_B = myOpMode.hardwareMap.get(Servo.class,"grabber_3");
+
 
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
         alphaDrive.setDirection(DcMotor.Direction.REVERSE);
@@ -137,7 +141,7 @@ public class HexbotHardware {
         betaDrive.setDirection(DcMotor.Direction.REVERSE);
         arm.setDirection(DcMotor.Direction.REVERSE);
 
-        // Expand PWM Range to maximum supported by HS-485HB to extend rotation range
+        // Expand PWM Range to maximum supported by HS-485HB to extend rotation range to 200 degrees
         turntable.setPwmRange(new PwmControl.PwmRange(553,2425));
 
         // If there are encoders connected, switch to RUN_USING_ENCODER mode for greater accuracy
@@ -248,7 +252,7 @@ public class HexbotHardware {
         // We pass the sin and cos arrays to avoid pulling heading again or repeating the math
         updatePosition(sin,cos);
         // return current heading
-        return orientation.getYaw(AngleUnit.DEGREES);
+        return orientation.getYaw(AngleUnit.DEGREES); // todo: consider returning position and heading
     }
 
     /**
@@ -488,6 +492,55 @@ public class HexbotHardware {
     }
 
     /**
+     * Get turntable position.
+     *
+     * @return Offset (position relative to servo midpoint) for the turntable
+     */
+    public double getTTOffset() {
+        return turntable.getPosition() - MID_SERVO;
+    }
+
+
+    /**
+     * Set grabber_A position.
+     *
+     * @param offset
+     */
+    public void set_A_Position(double offset) {
+        offset = Range.clip(offset, -0.5, 0.5);
+        grabber_A.setPosition(MID_SERVO + offset);
+    }
+
+    /**
+     * Get grabber_A position.
+     *
+     * @return Offset (position relative to servo midpoint) for Grabber A
+     */
+    public double getAOffset() {
+        return grabber_A.getPosition() - MID_SERVO;
+    }
+
+
+    /**
+     * Set grabber_B position.
+     *
+     * @param offset
+     */
+    public void set_B_Position(double offset) {
+        offset = Range.clip(offset, -0.5, 0.5);
+        grabber_B.setPosition(MID_SERVO + offset);
+    }
+
+    /**
+     * Get grabber_B position.
+     *
+     * @return Offset (position relative to servo midpoint) for Grabber B
+     */
+    public double getBOffset() {
+        return grabber_B.getPosition() - MID_SERVO;
+    }
+
+    /**
      * Pass the requested end effector power to the end effector servo
      *
      * @param power driving power (-1.0 to 1.0)
@@ -504,7 +557,7 @@ public class HexbotHardware {
      * @param angle         desired angle relative to level (0 degrees)
      * @return              target voltage taking into account arm angle and ee angle relative to arm
      */
-    public double get_eeTargetVoltage(int arm_height,double angle) {
+    public double get_eeLevelVoltage(int arm_height,double angle) {
         return v_level.getValue(arm_height) + (angle * VOLTS_PER_DEGREE);
     }
 

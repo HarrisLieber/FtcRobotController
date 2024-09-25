@@ -68,7 +68,9 @@ public class ColorMatch {
     // HL: I think technically this might be a root mean square and not a Euclidean distance,
     // but I wasn't a math major. In any case, this method is left unaltered from REV Robotics code
     // except that Color class is replaced with NormalizedRGBA class from the FTC SDK
-    private static double CalculateDistance(NormalizedRGBA color1, NormalizedRGBA color2) {
+    // I also made this method public (and changed from "CalculateDistance" to "calculateDistance")
+    //      so we can use it as an error term for PID control if we want to
+    public static double calculateDistance(NormalizedRGBA color1, NormalizedRGBA color2) {
         double redDiff = color1.red - color2.red;
         double greenDiff = color1.green - color2.green;
         double blueDiff = color1.blue - color2.blue;
@@ -117,7 +119,6 @@ public class ColorMatch {
 
     // Modified heavily from REV Robotics source code to change from creating an frc.Color object
     // from r g b values to creating an FTC NormalizedRGBA object from r g b a values
-    // ALSO made this private instead of public, and added a call to this from addColorMatch
     /**
      * Create a NormalizedRGBA object from r g b and a
      *
@@ -153,7 +154,7 @@ public class ColorMatch {
         int idx = 0;
         if (m_colorsToMatch.size() > 0) {
             for (int i = 0; i < m_colorsToMatch.size(); i++) {
-                double targetDistance = CalculateDistance(m_colorsToMatch.get(i), color);
+                double targetDistance = calculateDistance(m_colorsToMatch.get(i), color);
                 if (targetDistance < minDistance) {
                     minDistance = targetDistance;
                     idx = i;

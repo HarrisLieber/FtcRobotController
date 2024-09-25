@@ -57,6 +57,8 @@ public class IntoTheDeep extends HexbotHardware {
     // Setpoint tables for arm height and end effector angle
     private static int[] arm_pos = {0,0,0,0,0,0,0}; // todo: measure encoder ticks for each position
     private static double[] ee_angle = {0,75,90,90,45,45,150}; // just guesses todo: measure ee positions
+    private static final double A_OPEN = 0; // todo: measure open and closed offsets for both grabbers
+    private static final double A_CLOSED = 0;
     private static ColorMatch colorMatcher = new ColorMatch();
     private static final NormalizedRGBA TARGET_YELLOW = ColorMatch.makeColor(0.5f,0.5f,0f,1f);
     private static final NormalizedRGBA TARGET_BLUE = ColorMatch.makeColor(0f,0f,0.5f,1f);
@@ -84,5 +86,13 @@ public class IntoTheDeep extends HexbotHardware {
         colorMatcher.setConfidenceThreshold(0.9); // todo: test out confidence levels for color matching
     }
 
+    public void sample_pickup() {
+        set_A_Position(A_CLOSED);
+        // Would be nice to be able to detect a successful pickup and auto-retry if not
+    }
+
+    public void sample_drop() {
+        set_A_Position(A_OPEN);
+    }
 
 }
