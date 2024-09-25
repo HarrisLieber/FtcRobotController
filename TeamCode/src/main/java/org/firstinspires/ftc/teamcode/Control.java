@@ -44,20 +44,17 @@ public class Control {
 
     // Allow a new controller to be created with no parameters - default to proportional only, kp=1
     public Control() {
-        integral = 0;
-        lasterror = 0;
+        reset();
         setPIDConstants(1.0, 0,0,0);
     }
     // overload the constructor to allow PID constants to be set
     public Control(double kp, double ki, double kd) {
-        integral = 0;
-        lasterror = 0;
+        reset();
         setPIDConstants(kp,ki,kd);
     }
     // overload constructor again to allow PID constants and integral range to be set together
     public Control(double kp, double ki, double kd,double ir) {
-        integral = 0;
-        lasterror = 0;
+        reset();
         setPIDConstants(kp,ki,kd,ir);
     }
     /**
@@ -104,6 +101,7 @@ public class Control {
     public void reset() {
         integral = 0.0d;
         lasterror = 0.0d;
+        timer.reset();
     }
 
     // Broke out the integral term calculation to improve code reuse
