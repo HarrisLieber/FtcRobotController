@@ -75,7 +75,7 @@ public class HexbotHardware {
     // Define Drive constants.  Make them public so they CAN be used by the calling OpMode
     // Assuming for now that we want servo midpoint and move speed to be same for all servos
     public static final double MID_SERVO       =  0.5 ;
-    public static final double SERVO_SPEED      =  0.02 ;  // sets rate to move turntable servo
+    public static final double SERVO_SPEED      =  0.02 ;  // sets rate to move servo
 
     // Using classic AndyMark NeverRest 4o meters for drive wheels
     // 28 ticks per rotation for motor only, times GR 40 = 1120 ticks/rotation
@@ -301,7 +301,9 @@ public class HexbotHardware {
 
         // Use PID control (settings defined in Robot Class definition or settable with turn_control.settings)
         // Scaling down error by 60 degrees so kp doesn't have to be tiny to generate power in -1 to 1 range
-        return turn_control.PID(error/60,yawrate/60);
+        // Using negative yawrate as change in error over time
+        // i.e. if approaching target angle at angular speed, negative angular speed is rate error is "growing"
+        return turn_control.PID(error/60,-yawrate/60);
     }
     
     private double turn_to_target() {
@@ -430,7 +432,9 @@ public class HexbotHardware {
         double error = distance - linear_distance;
         double linear_speed = Math.hypot(speed[0],speed[1]); // todo: consider doing this math in updateposition if we will use it elsewhere
         // Scaling error down by 10 inches to kp doesn't have to be tiny to generate power in -1 to 1 range
-        return dist_control.PID(error/10,linear_speed/10);
+        // Using negative of linear speed as change in error over time
+        // i.e. if approaching target distance at speed, negative speed is the rate error is "growing"
+        return dist_control.PID(error/10,-linear_speed/10);
         // commenting out line below since limiting max speed doesn't make much sense
         //if (Math.abs(interim_power) > max_speed) return Math.copySign(max_speed,interim_power);
         //else return interim_power;
@@ -556,6 +560,18 @@ public class HexbotHardware {
         }
         int pos = arm.getCurrentPosition();
         return pos;
+    }
+
+
+    /**
+     * Reset encoder count on the arm to zero
+     *
+     */
+    public void resetArm() {
+        // reset arm motor encoder to zero, then put it back in whatever mode it was in
+        DcMotor.RunMode temp = arm.getMode();
+        arm.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        arm.setMode(temp);
     }
 
     /*
