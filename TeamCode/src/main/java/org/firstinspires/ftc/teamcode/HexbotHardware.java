@@ -42,6 +42,7 @@ import com.qualcomm.robotcore.hardware.ServoImplEx;
 import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.AngularVelocity;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
 // Use HexbotHardware class for hardware functions that are not game/season specific
@@ -93,7 +94,6 @@ public class HexbotHardware {
     private Control turn_control = new Control(1,0,0); // todo: tune PID for turn control
     private Control dist_control = new Control(1,0,0); // todo: tune PID for distance control
     private double target_heading = 0;
-    private double max_speed = 10.0;
 
 
     // Define a constructor that allows the OpMode to pass a reference to itself.
@@ -293,14 +293,15 @@ public class HexbotHardware {
         // todo: consider some efficiency changes so we're not reading the IMU multiple times per loop
         YawPitchRollAngles orientation = imu.getRobotYawPitchRollAngles();
         AngularVelocity angularVelocity = imu.getRobotAngularVelocity(AngleUnit.DEGREES);
-  
+
         // Normalize the heading error to a number between -180deg and +180deg
         // (add 180 and get remainder of dividing by 360 to get a result from 0-180, then subract 180)
         double error = ((target_heading - orientation.getYaw(AngleUnit.DEGREES) + 180) % 360) - 180;
         double yawrate = angularVelocity.zRotationRate; // rotation about the Z-axis (yaw) in degrees/second
 
         // Use PID control (settings defined in Robot Class definition or settable with turn_control.settings)
-        return turn_control.PID(error,yawrate);
+        // Scaling down error by 60 degrees so kp doesn't have to be tiny to generate power in -1 to 1 range
+        return turn_control.PID(error/60,yawrate/60);
     }
     
     private double turn_to_target() {
@@ -376,7 +377,7 @@ public class HexbotHardware {
      * robot motions: Drive (Axial motion) and Turn (Yaw motion).
      * This version uses PID control to travel in a straight line for a given distance
      * Then sends these power levels to the motors.
-     * This function takes a distance and bearing rather than x and y, with power limited by max_speed
+     * This function takes a distance and bearing rather than x and y
      *
      * @param distance  distance to travel, in inches
      * @param bearing   direction of movement in degrees
@@ -392,7 +393,7 @@ public class HexbotHardware {
      * robot motions: Drive (Axial motion) and Turn (Yaw motion).
      * This version uses PID control to travel in a straight line for a given distance
      * Then sends these power levels to the motors.
-     * This function takes a distance and bearing rather than x and y, with power limited by max_speed
+     * This function takes a distance and bearing rather than x and y
      *
      * @param distance  distance to travel, in inches
      * @param bearing   direction of movement in degrees
@@ -411,7 +412,7 @@ public class HexbotHardware {
      * This version uses PID control to travel in a straight line for a given distance
      * This version also uses PID control to turn to a specified heading
      * Then sends these power levels to the motors.
-     * This function takes a distance and bearing rather than x and y, with power limited by max_speed
+     * This function takes a distance and bearing rather than x and y
      *
      * @param distance  distance to travel, in inches
      * @param bearing   direction of movement in degrees
@@ -426,12 +427,13 @@ public class HexbotHardware {
         if (!dist_control.isActive()) linear_distance = 0;
 
         // Use PID control (settings defined in Robot Class definition or settable with dist_control.settings)
-        error = distance - linear_distance;
-        linear_speed = Math.hypot(speed[0],speed[1]); // todo: consider doing this math in updateposition if we will use it elsewhere
-        double interim_power = dist_control.PID(error,linear_speed);
-        if (Math.abs(interim_power) > max_speed) return Math.copysign(max_speed,interim_power);
-        else return interim_power;
-        // todo: limit power using max_speed - is the commanded power really a speed? Currently limiting power to max_speed
+        double error = distance - linear_distance;
+        double linear_speed = Math.hypot(speed[0],speed[1]); // todo: consider doing this math in updateposition if we will use it elsewhere
+        // Scaling error down by 10 inches to kp doesn't have to be tiny to generate power in -1 to 1 range
+        return dist_control.PID(error/10,linear_speed/10);
+        // commenting out line below since limiting max speed doesn't make much sense
+        //if (Math.abs(interim_power) > max_speed) return Math.copySign(max_speed,interim_power);
+        //else return interim_power;
         // todo: should drive methods return error to calling functions so they know when to stop? Should we reset linear_distance?
     }
 
@@ -523,14 +525,14 @@ public class HexbotHardware {
     public void setTarget_heading(double target_heading) {
         this.target_heading = target_heading; // todo: error checking on commanded target heading
     }
-
-    public double getMax_speed() {
-        return max_speed;
-    }
-
-    public void setMax_speed(double max_speed) {
-        this.max_speed = max_speed; // todo: error checking on commanded max speed
-    }
+//
+//    public double getMax_speed() {
+//        return max_speed;
+//    } // todo: is max speed needed? Not using
+//
+//    public void setMax_speed(double max_speed) {
+//        this.max_speed = max_speed; // todo: error checking on commanded max speed
+//    }
 
 
     /*
