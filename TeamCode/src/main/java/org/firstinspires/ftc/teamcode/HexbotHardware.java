@@ -45,6 +45,8 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AngularVelocity;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
+import java.util.EnumMap;
+
 // Use HexbotHardware class for hardware functions that are not game/season specific
 public class HexbotHardware {
 
@@ -94,6 +96,34 @@ public class HexbotHardware {
     private Control turn_control = new Control(1,0,0); // todo: tune PID for turn control
     private Control dist_control = new Control(1,0,0); // todo: tune PID for distance control
     private double target_heading = 0;
+
+    /**
+     * Enumerator for direction map
+     * Convenient way to report out common buttons/combos of buttons
+     * Including NorthSouth and WestEast though these do not make any directional sense
+     */
+    public enum Dmap {
+        NORTH, NORTHEAST, EAST, SOUTHEAST, SOUTH, SOUTHWEST, WEST, NORTHWEST,
+        NORTHSOUTH, WESTEAST, NONE
+    }
+
+    /**
+     * Map each direction to a heading in degrees
+     */
+    public static final EnumMap<Dmap,Double> DIRECTION = new EnumMap<>(Dmap.class);
+    static {
+        DIRECTION.put(Dmap.NORTH,0d);
+        DIRECTION.put(Dmap.NORTHEAST,45d);
+        DIRECTION.put(Dmap.EAST,90d);
+        DIRECTION.put(Dmap.SOUTHEAST,135d);
+        DIRECTION.put(Dmap.SOUTH,180d);
+        DIRECTION.put(Dmap.SOUTHWEST,-135d);
+        DIRECTION.put(Dmap.WEST,-90d);
+        DIRECTION.put(Dmap.NORTHWEST,-45d);
+        DIRECTION.put(Dmap.NORTHSOUTH,0d);    // Nonsense direction Northsouth maps to North
+        DIRECTION.put(Dmap.WESTEAST,90d);     // Nonsense direction Westeast maps to East
+    }
+
 
 
     // Define a constructor that allows the OpMode to pass a reference to itself.
