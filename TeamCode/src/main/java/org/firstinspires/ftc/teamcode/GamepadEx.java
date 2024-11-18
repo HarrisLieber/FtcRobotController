@@ -102,7 +102,7 @@ public class GamepadEx extends Gamepad {
      */
     public GamepadEx(Gamepad gamepad) {
         this.gamepad = gamepad;
-        current.copy(gamepad);
+        current.copy(this.gamepad);
         triggerthreshold = TRIGGERTHRESHOLDDEFAULT;
     }
 
@@ -808,6 +808,23 @@ public class GamepadEx extends Gamepad {
                 break;
         }
         return returnvalue;
+    }
+
+    /**
+     * Rumble the gamepad for a certain number of "blips" using predetermined blip timing
+     * This will displace any currently running rumble effect.
+     * Note this is a copy of stock Gamepad rumbleBlips that rumbles the left side only
+     * (except that it uses the public function runRumbleEffect instead of the private queueeffect)
+     * @param count the number of rumble blips to perform
+     */
+    public void rumbleBlips_2(int count) {
+        RumbleEffect.Builder builder = new RumbleEffect.Builder();
+
+        for(int i = 0; i < count; i++) {
+            builder.addStep(0,1.0,250).addStep(0,0,100);
+        }
+
+        runRumbleEffect(builder.build());
     }
 
 

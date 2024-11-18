@@ -35,7 +35,7 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.util.RobotLog;
 
 
-@TeleOp(name="Test Controls and Sensors", group="Robot")
+@TeleOp(name="Test Drive Functions", group="Robot")
 //@Disabled
 public class TestDrive extends LinearOpMode {
 
