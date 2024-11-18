@@ -37,7 +37,7 @@ import com.qualcomm.robotcore.util.RobotLog;
 
 @TeleOp(name="Test Controls and Sensors", group="Robot")
 //@Disabled
-public class TestControls extends LinearOpMode {
+public class TestDrive extends LinearOpMode {
 
     // Create a RobotHardware object to be used to access robot hardware.
     // Prefix any hardware functions with "robot." to access this class.
@@ -86,24 +86,26 @@ public class TestControls extends LinearOpMode {
 
             // Run wheels in POV mode (note: The joystick goes negative when pushed forward, so negate it)
             // In this mode the Left stick moves the robot in XY directions, right/left dpad rotates.
-            drive[0] = gamepad[1].right_stick_x;
-            drive[1] = gamepad[1].right_stick_y;
+            // Scale drive with square of joystick so there's more fine control with small inputs, but still full out at the edges
+            drive[0] = gamepad[1].right_stick_x * Math.abs(gamepad[1].right_stick_x);
+            drive[1] = gamepad[1].right_stick_y * Math.abs(gamepad[1].right_stick_y);
             if (gamepad[1].dpad_left) turn = -TURN_POWER;
             else if (gamepad[1].dpad_right) turn = TURN_POWER;
             else turn = 0;
 
-            // Use left stick Y axis to control arm
+/* Commenting out all controls other than driving for this test opmode
+            // Use right stick Y axis to control arm
             arm = gamepad[1].left_stick_y;
             arm_pos = robot.setArmPower(arm);
             // detect rising edge on cross button to reset arm encoder
             if (gamepad[1].cross && !gamepad[0].cross) robot.resetArm();
-
-            // Combine drive and turn for blended motion, get current heading
-/* Commenting out Drive for this "controls" test opmode
-            heading = robot.xydrive(drive[1],drive[0], turn);
-            position = robot.getPosition();
 */
 
+            // Combine drive and turn for blended motion, get current heading
+            heading = robot.xydrive(drive[1],drive[0], turn);
+            position = robot.getPosition();
+
+/* Commenting out all controls other than driving for this test opmode
             // Use gamepad up & down dpad to raise and lower the end effector
             if (gamepad[1].dpad_up) ee_pos = robot.setEEPower(1.0);
             else if (gamepad[1].dpad_down) ee_pos = robot.setEEPower(-1.0);
@@ -116,13 +118,13 @@ public class TestControls extends LinearOpMode {
             switch (servostate) {
                 case 0:
                     // turntable
-                    gamepad1.setLedColor(1,0,0,Gamepad.LED_DURATION_CONTINUOUS);
+                    gamepad1.setLedColor(1,0,0,5000);
                     if (gamepad[1].touchpad_finger_1) ttOffset = gamepad[1].touchpad_finger_1_x;
                     robot.setTTPosition(ttOffset);
                     break;
                 case 1:
                     // grabber A
-                    gamepad1.setLedColor(0,1,0,Gamepad.LED_DURATION_CONTINUOUS);
+                    gamepad1.setLedColor(0,1,0,5000);
                     if (gamepad[1].touchpad_finger_1) {
                         aOffset = gamepad[1].touchpad_finger_1_x;
                         robot.set_A_Position(aOffset);
@@ -137,7 +139,8 @@ public class TestControls extends LinearOpMode {
                     break;
                 case 2:
                     // grabber B
-                    gamepad1.setLedColor(0,0,1,Gamepad.LED_DURATION_CONTINUOUS);
+                    gamepad1.setLedColor(0,0,1,5000);
+                    gamepad1.setLedColor(0,1,0,5000);
                     if (gamepad[1].touchpad_finger_1) {
                         bOffset = gamepad[1].touchpad_finger_1_x;
                         robot.set_B_Position(bOffset);
@@ -159,6 +162,7 @@ public class TestControls extends LinearOpMode {
 
             // detect rising edge on circle button to capture an arm/ee pair
             if (gamepad[1].circle && !gamepad[0].circle) lt.addRow(arm_pos, ee_pos);
+*/
 
 
                 // detect rising edge on playstation button to dump data to the robot log
@@ -174,15 +178,15 @@ public class TestControls extends LinearOpMode {
                 RobotLog.d(String.valueOf(lt.getTable()));
             }
 
-            telemetry.addLine("Share button to change modes: red=tt; green=A; blue=B");
-            telemetry.addLine("Bumpers store servo position: left=open; right=closed");
-            telemetry.addLine("Arm: Cross=reset; Circle=capture position; PS=dump log");
+//            telemetry.addLine("Share button to change modes: red=tt; green=A; blue=B");
+//            telemetry.addLine("Bumpers store servo position: left=open; right=closed");
+//            telemetry.addLine("Arm: cross=reset; Circle=capture position; PS=dump log");
             telemetry.addData("Field location (x,y): ","%4.1f,%4.1f",position[0],position[1]);
-            telemetry.addData("Arm position: ",arm_pos);
-            telemetry.addData("EE position (V): ","%1.3f",ee_pos);
-            telemetry.addData("TT position: ","%1.3f",ttOffset);
-            telemetry.addData("A open/closed: ","%1.3f,%1.3f",aopen,aclosed);
-            telemetry.addData("B open/closed: ","%1.3f,%1.3f",bopen,bclosed);
+//            telemetry.addData("Arm position: ",arm_pos);
+//            telemetry.addData("EE position (V): ","%1.3f",ee_pos);
+//            telemetry.addData("TT position: ","%1.3f",ttOffset);
+//            telemetry.addData("A open/closed: ","%1.3f,%1.3f",aopen,aclosed);
+//            telemetry.addData("B open/closed: ","%1.3f,%1.3f",bopen,bclosed);
             if (gamepad1.y) {
                 robot.resetGyro();
             } else {
