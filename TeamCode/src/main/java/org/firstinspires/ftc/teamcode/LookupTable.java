@@ -36,72 +36,59 @@ import com.qualcomm.robotcore.util.Range;
 
 import java.util.TreeMap;
 
-
-public class LookupTable {
-    private TreeMap<Integer,Double> l_Table; // todo: is there a way to genericize so lookup key could be other types?
-
-
-    public LookupTable() {
-        l_Table = new TreeMap<Integer,Double>();
-    }
-
-    /**
-     * Add a row to the lookup table in key,value pairs (double, double)
-     * @param key   number representing the lookup key for which to generate a value
-     * @param value number representing the value associated with that key
-     */
-    public void addRow(int key, double value) {
-        l_Table.put(key, value);
-    }
-
-    /**
-     * Retrieve the lookup table for logging etc
-     * @return The whole lookup table
-     */
-    public TreeMap<Integer,Double> getTable() {
-        return l_Table;
-    }
+/**
+ * LookupTable is an extension of TreeMap that takes any number object as key and value
+ * Adds a getvalue function to estimate values at points not defined in the map by linear interpolation
+ * @param <K> the type of the key (extends Number)
+ * @param <V> the type of the value (extends Number)
+ */
+public class LookupTable<K extends Number,V extends Number> extends TreeMap<K,V> {
 
     /**
      * Get a value from the lookup table given an arbitrary key using linear interpolation
-     * @param key   double representing the lookup key for which to generate a value
+     * Note: always returns a double as the result of interpolation
+     * @param key   lookup key for which to generate a value
      * @return      value for that key based on linear interpolation from existing table entries
      */
-    public double getValue(int key) {
-        int key1;
-        int key2;
+    public double getValue(K key) {
+        K key1 = lowerKey(key); // If key is lower than lowest entry, lowerkey returns null
+        K key2 = higherKey(key); // If key is higher then highest entry, higherkey returns null
+        double x, x1, x2, y1, y2;
 
         // first check if the key exists in the lookup table. If so, simply return the value
-        if (l_Table.containsKey(key)) {
-            return l_Table.get(key);
+        if (key == null) {
+            throw new IllegalStateException();
+        }
+        else if (containsKey(key)) {
+            return get(key).doubleValue();
             // Then we start to check the edge cases
-        } else if (l_Table.size() < 2) {
+        } else if (size() < 2) {
             // If there are fewer than two entries in the table, inerpolation is impossible
             // We quit and return null
             throw new IllegalStateException();
         } else {
-            if (key < l_Table.firstKey()) {
+            if (key1 == null) {
                 // If our key is lower than the lowest entry in the lookup table:
                 // We interpolate down based on the first two values in the table.
-                key1 = l_Table.firstKey();
-                key2 = l_Table.higherKey(key1);
-                return l_Table.get(key1) - (key1-key) * (l_Table.get(key2)-l_Table.get(key1)) / (key2 - key1);
-
-            } else if (key > l_Table.lastKey()) {
+                key1 = firstKey();
+                key2 = higherKey(key1);
+            } else if (key2 == null) {
                 // If our key is higher than the highest entry in the lookup table:
                 // We interpolate up based on the last two values in the table.
-                key2 = l_Table.lastKey();
-                key1 = l_Table.lowerKey(key2);
-                return l_Table.get(key2) + (key-key2) * (l_Table.get(key2)-l_Table.get(key1)) / (key2 - key1);
-
-            } else {
-                // Here's our normal case. We're somewhere in the middle of the table, and we
-                // interpolate between the next lowest lookup key and the next highest
-                key1 = l_Table.lowerKey(key);
-                key2 = l_Table.higherKey(key);
-                return l_Table.get(key1) + (key-key1) * (l_Table.get(key2)-l_Table.get(key1)) / (key2 - key1);
+                key2 = lastKey();
+                key1 = lowerKey(lastKey());
             }
-
+            // If neither key1 nor key2 are null, we're in "normal case". We're somewhere in the
+            // middle of the table, and we can leave the values of key1 and k2 as is, and
+            // interpolate between the next lowest lookup key and the next highest
+            x = key.doubleValue();
+            x1 = key1.doubleValue();
+            x2 = key2.doubleValue();
+            y1 = get(key2).doubleValue();
+            y2 = get(key1).doubleValue();
+            // Linear interpolation based on the two-points-form equation for a line:
+            // (y-y1) = (y2=y1) * (x-x1) / (x2 - x1)
+            return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
         }
     }
 

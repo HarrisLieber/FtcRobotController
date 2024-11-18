@@ -91,7 +91,7 @@ public class HexbotHardware {
     private int[] wheel_travel = {0,0,0};   // alpha, beta, and gamma encoder counts
     private double linear_distance = 0;     // estimated total linear distance in inches
     private static double VOLTS_PER_DEGREE = 0.025; // just a guess todo: measure volts per degree for ee
-    private LookupTable v_level;
+    private LookupTable<Integer,Double> v_level;
     // Create PID controllers for robot turning and robot distance
     private Control turn_control = new Control(1,0,0); // todo: tune PID for turn control
     private Control dist_control = new Control(1,0,0); // todo: tune PID for distance control
@@ -139,8 +139,8 @@ public class HexbotHardware {
         // Create a lookup table with:
         //      Key = Integer (encoder counts for arm motor)
         //      Value = Double (voltage on the potentiometer for the "level" zero position of end effector)
-        v_level = new LookupTable();
-        v_level.addRow(0,0.0d); // build lookuptable here todo: measure voltage at various arm positions
+        v_level = new LookupTable<Integer,Double>();
+        v_level.put(0,0.0d); // build lookuptable here todo: measure voltage at various arm positions
     }
 
     /**

@@ -69,7 +69,7 @@ public class TestControls extends LinearOpMode {
         double aopen = 0, aclosed = 0, bopen = 0, bclosed = 0;
         // state for setting servo (0 = turntable, 1 = grabber A, 2 = grabber B)
         int servostate = 0;
-        LookupTable lt = new LookupTable();
+        LookupTable<Integer, Double> lt = new LookupTable<Integer,Double>();
 
         // initialize all the hardware, using the hardware class
         robot.init();
@@ -158,7 +158,7 @@ public class TestControls extends LinearOpMode {
             else if (gamepad[1].left_trigger <= 0.1 && gamepad[0].left_trigger > 0.1) robot.set_B_Position(bopen);
 
             // detect rising edge on circle button to capture an arm/ee pair
-            if (gamepad[1].circle && !gamepad[0].circle) lt.addRow(arm_pos, ee_pos);
+            if (gamepad[1].circle && !gamepad[0].circle) lt.put(arm_pos, ee_pos);
 
 
                 // detect rising edge on playstation button to dump data to the robot log
@@ -171,7 +171,7 @@ public class TestControls extends LinearOpMode {
                 RobotLog.d(String.format("A open/closed: %1.3f,%1.3f",aopen,aclosed));
                 RobotLog.d(String.format("B open/closed: %1.3f,%1.3f",bopen,bclosed));
                 RobotLog.d("Arm lookup table:");
-                RobotLog.d(String.valueOf(lt.getTable()));
+                RobotLog.d(String.valueOf(lt));
             }
 
             telemetry.addLine("Share button to change modes: red=tt; green=A; blue=B");
