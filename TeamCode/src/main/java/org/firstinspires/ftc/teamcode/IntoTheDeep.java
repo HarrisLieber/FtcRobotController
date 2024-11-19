@@ -76,8 +76,8 @@ public class IntoTheDeep extends HexbotHardware {
         // Define and Initialize Motors, Servos, Sensors
         // Initialize the hardware variables. Note that the strings used here must correspond
         // to the names assigned during the robot configuration step on the DS or RC devices.
-        color_A  = myOpMode.hardwareMap.get(NormalizedColorSensor.class, "color_0");
-        color_B  = myOpMode.hardwareMap.get(NormalizedColorSensor.class, "color_1");
+        //color_A  = myOpMode.hardwareMap.get(NormalizedColorSensor.class, "color_0");
+        //color_B  = myOpMode.hardwareMap.get(NormalizedColorSensor.class, "color_1");
 
         colorMatcher.addColorMatch(TARGET_YELLOW);
         colorMatcher.addColorMatch(TARGET_BLUE);

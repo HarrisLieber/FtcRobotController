@@ -31,14 +31,14 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.hardware.Gamepad;
 
-public class GamepadEx extends Gamepad {
+public class GamepadEx {
 
     /**
      * The gamepad object to be passed from the opmode
      */
     public Gamepad gamepad;
-    private Gamepad current; // current values of the gamepad
-    private Gamepad past; // gamepad values from past iteration
+    private Gamepad current = new Gamepad(); // current values of the gamepad
+    private Gamepad past = new Gamepad(); // gamepad values from past iteration
     public HexbotHardware.Dmap dpad_pressed, dpad_rising, buttons_pressed, buttons_rising;
 
     /**
@@ -818,14 +818,29 @@ public class GamepadEx extends Gamepad {
      * @param count the number of rumble blips to perform
      */
     public void rumbleBlips_2(int count) {
-        RumbleEffect.Builder builder = new RumbleEffect.Builder();
+        Gamepad.RumbleEffect.Builder builder = new Gamepad.RumbleEffect.Builder();
 
         for(int i = 0; i < count; i++) {
             builder.addStep(0,1.0,250).addStep(0,0,100);
         }
 
-        runRumbleEffect(builder.build());
+        gamepad.runRumbleEffect(builder.build());
     }
 
-
+    /*
+    Create passthrough functions to access selected public methods of gamepad.
+    This all feels a little inelegant - surely I should be able to create "GamepadEx extends Gamepad"
+    and still retain access to the methods for the object passed in the constructor?
+    Anyway, this works fine for now...
+     */
+    public boolean atRest() {return gamepad.atRest();}
+    public void reset() {gamepad.reset();}
+    public void setLedColor(double r, double g, double b, int durationMs) {gamepad.setLedColor(r,g,b,durationMs);}
+    public void runLedEffect(Gamepad.LedEffect effect) {gamepad.runLedEffect(effect);}
+    public void runRumbleEffect(Gamepad.RumbleEffect effect) {gamepad.runRumbleEffect(effect);}
+    public void rumble(double rumble1, double rumble2, int durationMs) {gamepad.rumble(rumble1,rumble2,durationMs);}
+    public void rumble(int durationMs) {gamepad.rumble(durationMs);}
+    public void stopRumble() {gamepad.stopRumble();}
+    public void rumbleBlips(int count) {gamepad.rumbleBlips(count);}
+    public boolean isRumbling() {return gamepad.isRumbling();}
 }
